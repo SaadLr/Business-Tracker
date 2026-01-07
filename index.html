@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Tracker 2026 - Morocco</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @media print {
+            @page { size: A4 landscape; margin: 0.5cm; }
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-grid { border: 1px solid #e2e8f0 !important; }
+        }
+        input::-webkit-outer-spin-button, 
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+        button { transition: all 0.2s ease; }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        
+        const Icon = ({ name, size = 16, className = "" }) => {
+            useEffect(() => { 
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const App = () => {
+            const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1));
+            const [data, setData] = useState({});
+            const employees = ['Tarik', 'Jonas', 'Haytam', 'Amine', 'Alfrido', 'Oussama', 'Salah'];
+
+            useEffect(() => {
+                try {
+                    const saved = localStorage.getItem('tracker_2026_data');
+                    if (saved) setData(JSON.parse(saved));
+                } catch (e) { console.error("Storage error", e); }
+            }, []);
+
+            useEffect(() => {
+                try {
+                    localStorage.setItem('tracker_2026_data', JSON.stringify(data));
+                } catch (e) { console.error("Save error", e); }
+            }, [data]);
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            const stats = useMemo(() => {
+                let totalVideos = 0, totalCash = 0, totalCard = 0, activeDays = 0;
+                const staffCounts = {};
+                employees.forEach(e => staffCounts[e] = 0);
+
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const key = `${year}-${month + 1}-${d}`;
+                    const entry = data[key] || {};
+                    totalVideos += Number(entry.videos || 0);
+                    totalCash += Number(entry.cash || 0);
+                    totalCard += Number(entry.card || 0);
+                    const attendance = entry.attendance || [];
+                    if (attendance.length > 0 || entry.videos || entry.cash || entry.card) activeDays++;
+                    attendance.forEach(name => { if(staffCounts[name] !== undefined) staffCounts[name]++; });
+                }
+                return { totalVideos, totalCash, totalCard, totalRevenue: totalCash + totalCard, activeDays, staffCounts };
+            }, [data, year, month]);
+
+            const updateData = (day, field, value) => {
+                const key = `${year}-${month + 1}-${day}`;
+                setData(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+            };
+
+            const toggleStaff = (day, name) => {
+                const key = `${year}-${month + 1}-${day}`;
+                const current = data[key]?.attendance || [];
+                const next = current.includes(name) ? current.filter(n => n !== name) : [...current, name];
+                updateData(day, 'attendance', next);
+            };
+
+            const renderDays = () => {
+                const days = [];
+                const totalDays = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay();
+                const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+                for (let i = 0; i < startOffset; i++) {
+                    days.push(<div key={`pad-${i}`} className="bg-slate-50/50 border-r border-b min-h-[160px]"></div>);
+                }
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const key = `${year}-${month + 1}-${d}`;
+                    const entry = data[key] || { attendance: [], videos: '', cash: '', card: '' };
+                    const dayDate = new Date(year, month, d);
+                    const isWeekend = [0, 6].includes(dayDate.getDay());
+                    const isToday = new Date().toDateString() === dayDate.toDateString();
+                    
+                    days.push(
+                        <div key={d} className={`border-r border-b p-2 flex flex-col gap-1 min-h-[180px] ${isToday ? 'bg-blue-50/40' : (isWeekend ? 'bg-slate-50' : 'bg-white')}`}>
+                            <div className="flex justify-between items-center font-bold text-xs mb-1">
+                                <span className={`w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : (isWeekend ? 'text-slate-400' : 'text-slate-800')}`}>{d}</span>
+                                <span className="text-[9px] uppercase text-slate-400 font-black">{dayDate.toLocaleDateString('en', {weekday:'short'})}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mb-2">
+                                {employees.map(emp => (
+                                    <button key={emp} onClick={() => toggleStaff(d, emp)} className={`text-[8px] px-1 py-0.5 rounded border font-black ${entry.attendance?.includes(emp) ? 'bg-green-500 text-white border-green-600' : 'bg-white text-slate-300 border-slate-100 hover:border-slate-300'}`}>
+                                        {emp.substring(0,2).toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="space-y-1">
+                                <div className="relative group">
+                                    <div className="absolute left-1 top-1.5 text-slate-300 group-focus-within:text-blue-500"><Icon name="video" size={10}/></div>
+                                    <input type="number" placeholder="Videos" value={entry.videos || ''} onChange={e => updateData(d, 'videos', e.target.value)} className="w-full text-[10px] pl-5 p-1 border border-slate-100 rounded outline-none focus:border-blue-400 bg-white/50"/>
+                                </div>
+                                <div className="grid grid-cols-2 gap-1">
+                                    <div className="relative group">
+                                        <span className="absolute left-1 top-1.5 text-[7px] font-black text-slate-300">DH</span>
+                                        <input type="number" placeholder="Cash" value={entry.cash || ''} onChange={e => updateData(d, 'cash', e.target.value)} className="w-full text-[10px] pl-4 p-1 border border-slate-100 rounded outline-none focus:border-green-400 bg-white/50"/>
+                                    </div>
+                                    <div className="relative group">
+                                        <span className="absolute left-1 top-1.5 text-[7px] font-black text-slate-300">CB</span>
+                                        <input type="number" placeholder="Card" value={entry.card || ''} onChange={e => updateData(d, 'card', e.target.value)} className="w-full text-[10px] pl-4 p-1 border border-slate-100 rounded outline-none focus:border-green-400 bg-white/50"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-auto pt-1 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                                <span className="text-slate-400 font-medium">Day Total</span>
+                                <span className="font-black text-slate-800">{(Number(entry.cash)||0)+(Number(entry.card)||0)} <span className="text-[8px] font-normal opacity-50">MAD</span></span>
+                            </div>
+                        </div>
+                    );
+                }
+                return days;
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col text-slate-900 font-sans">
+                    <header className="bg-white border-b border-slate-200 p-4 flex flex-wrap justify-between items-center gap-4 no-print sticky top-0 z-20 shadow-sm">
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg"><Icon name="layout" size={20}/></div>
+                                <h1 className="text-lg font-black uppercase">Tracker <span className="text-blue-600">2026</span></h1>
+                            </div>
+                            <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                                <button onClick={() => setCurrentDate(new Date(year, month-1, 1))} className="p-2 hover:bg-white rounded-lg transition-all text-slate-500 hover:text-blue-600"><Icon name="chevron-left" size={18}/></button>
+                                <span className="px-6 font-black min-w-[150px] text-center text-xs uppercase tracking-widest">{monthNames[month]}</span>
+                                <button onClick={() => setCurrentDate(new Date(year, month+1, 1))} className="p-2 hover:bg-white rounded-lg transition-all text-slate-500 hover:text-blue-600"><Icon name="chevron-right" size={18}/></button>
+                            </div>
+                        </div>
+                        <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 text-xs font-black hover:bg-slate-800 shadow-lg uppercase tracking-wider">
+                            <Icon name="printer" size={14}/> Print PDF
+                        </button>
+                    </header>
+                    <main className="p-6 flex flex-col lg:flex-row gap-6 print:p-0">
+                        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden print-grid">
+                            <div className="grid grid-cols-7 bg-slate-50 border-b text-center py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <div key={d}>{d}</div>)}
+                            </div>
+                            <div className="grid grid-cols-7">{renderDays()}</div>
+                        </div>
+                        <aside className="w-full lg:w-80 flex flex-col gap-6 no-print print:flex-row print:w-full print:mt-8">
+                            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex-1">
+                                <h2 className="text-[10px] font-black text-blue-600 uppercase mb-6 flex items-center gap-2"><Icon name="activity" size={14}/> Monthly Metrics</h2>
+                                <div className="space-y-8">
+                                    <div className="bg-slate-900 p-5 rounded-2xl text-white">
+                                        <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Total Revenue</div>
+                                        <div className="text-3xl font-black tracking-tighter">{stats.totalRevenue.toLocaleString()} <span className="text-xs font-normal text-slate-500 italic">MAD</span></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                                            <div className="text-[10px] text-blue-500 font-black mb-1 uppercase">Videos</div>
+                                            <div className="text-2xl font-black">{stats.totalVideos}</div>
+                                        </div>
+                                        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+                                            <div className="text-[10px] text-green-500 font-black mb-1 uppercase">Days</div>
+                                            <div className="text-2xl font-black">{stats.activeDays}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 font-black uppercase mb-4 border-b pb-2">Staff Attendance</div>
+                                        <div className="space-y-4">
+                                            {employees.map(emp => (
+                                                <div key={emp} className="flex flex-col gap-1.5">
+                                                    <div className="flex justify-between text-[11px] font-bold">
+                                                        <span className="text-slate-600">{emp}</span>
+                                                        <span className="text-blue-600 font-black">{stats.staffCounts[emp]}</span>
+                                                    </div>
+                                                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-blue-500" style={{ width: `${(stats.staffCounts[emp] / 31) * 100}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </main>
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
